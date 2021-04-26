@@ -9,6 +9,21 @@ import lombok.Data;
  */
 @Data
 public class Food {
+    /**
+     * name
+     */
     private String foodName;
+    /**
+     * id
+     */
     private Integer foodId;
+
+    /**
+     * no
+     */
+    private Integer foodNo;
+    /**
+     * 点了该食物的顾客
+     */
+    private Customer byCustomer;
 }
