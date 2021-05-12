@@ -1,9 +1,6 @@
 package com.chinasoft.springboot.thread;
 
-import com.chinasoft.springboot.entities.Chef;
 import com.chinasoft.springboot.entities.Shop;
-
-import java.util.List;
 
 /**
  * @author 15075
@@ -13,7 +10,6 @@ import java.util.List;
 
 public class ChefThread implements Runnable{
     private Shop shop;
-
     public ChefThread(Shop shop){
         this.shop = shop;
     }
@@ -23,6 +19,5 @@ public class ChefThread implements Runnable{
         while (true){
             shop.zuoCai();
         }
-
     }
 }

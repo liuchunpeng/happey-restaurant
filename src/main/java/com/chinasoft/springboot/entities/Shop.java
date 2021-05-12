@@ -1,6 +1,7 @@
 package com.chinasoft.springboot.entities;
 
 import lombok.Data;
+import org.springframework.util.ObjectUtils;
 
 import java.util.ArrayList;
 import java.util.LinkedList;
@@ -18,11 +19,20 @@ import java.util.concurrent.locks.ReentrantLock;
 @Data
 public class Shop {
 
-    Menu menu = getMenu();
+    /**
+     * 菜单初始化
+     */
+    Menu menu = initMenu();
 
+    /**
+    等待制作的菜品
+     */
     List<Food> foods = new ArrayList<>();
 
-    List<Chef> chefs = new ArrayList<>();
+    /**
+     * 今日订单数计数器
+     */
+    Integer foodSize = 0;
 
     /**排队中的顾客*/
     List<Customer> customers = new LinkedList<>();
@@ -30,12 +40,17 @@ public class Shop {
     /**全部的顾客*/
     List<Customer> allCustomers = new LinkedList<>();
 
+    /**桌椅*/
     List<Table> tables = getTables();
 
     Lock lock = new ReentrantLock();
     Condition condition = lock.newCondition();
 
-    private static List<Table> getTables() {
+    /**
+     * 模拟餐厅座椅数据
+     * @return
+     */
+    private List<Table> getTables() {
         Table table1 = new Table();
         table1.setTid(1);
         Chair chai1 = new Chair();
@@ -67,7 +82,11 @@ public class Shop {
         return  tables;
     }
 
-    private static Menu getMenu() {
+    /**
+     * 菜单初始化
+     * @return
+     */
+    private Menu initMenu() {
         Menu menu = new Menu();
         List<Food> cai = new ArrayList<>();
         Food food1 = new Food();
@@ -95,9 +114,12 @@ public class Shop {
         return menu;
     }
 
+    /**
+     * 模拟餐厅进入客人
+     */
     public void addCustomer(){
         try {
-            //平均每5秒招揽一位顾客
+            //平均每2秒招揽一位顾客
             Thread.sleep(2000);
         } catch (InterruptedException e) {
             e.printStackTrace();
@@ -110,6 +132,7 @@ public class Shop {
         try {
             customers.add(customer);
             allCustomers.add(customer);
+            //客人光临，唤醒椅子线程招待客人入座
             condition.signal();
         } finally {
             lock.unlock();
@@ -119,15 +142,20 @@ public class Shop {
 
     }
 
+    /**
+     * 椅子线程监控椅子和顾客状态进行为客人分配座位
+     * @throws InterruptedException
+     */
     public void paiChair() throws InterruptedException {
         lock.lock();
         try {
+            //有无空座标识
             boolean isEmpty =false;
             out:
             for (Table table:tables) {
                 for (Chair chair : table.getChairs()) {
 
-                    //椅子上无顾客就放进等待中的顾客
+                    //判断当前有无空座
                     if (chair.getCustomer() == null) {
                         isEmpty =true;
                         break out;
@@ -136,13 +164,15 @@ public class Shop {
             }
 
             if (customers.size()<=0 || !isEmpty ){
+                //没有顾客或者没有空座，进入等待
                 condition.await();
-            }else {
-
+            }
+            //椅子上无顾客就请进等待中的顾客
+            else {
                 outer:
                 for (Table table:tables)  {
                     for (Chair chair: table.getChairs()) {
-                        System.out.println(chair);
+
                         //椅子上无顾客就放进等待中的顾客
                         if (chair.getCustomer() == null){
 
@@ -156,11 +186,14 @@ public class Shop {
 
                             //客人从等待队列中移除
                             customers.remove(0);
-                            Random r = new Random(1);
+
+                            Random r = new Random();
                             Integer ran1 = r.nextInt(menu.getMenu().size());
+
+                            //模拟顾客点菜，随机生成一份点菜单
                             Food food = new Food();
                             Food menuFood = menu.getMenu().get(ran1);
-                            food.setFoodNo(foods.size()+1);
+                            food.setFoodNo(++foodSize);
                             food.setFoodName(menuFood.getFoodName());
                             food.setFoodId(menuFood.getFoodId());
                             food.setByCustomer(customer);
@@ -168,29 +201,27 @@ public class Shop {
                             foods.add(food);
                             System.out.println("顾客"+customer.getCusName()+"点了" + food.getFoodName());
 
-                            //唤醒厨师线程
+                            //客人点菜，唤醒厨师线程做菜
                             condition.signal();
-
-                            System.out.println("剩余等待客人：" + customers.size() + "人");
 
                             break outer;
                         }
-
                     }
                 }
-
             }
         }finally {
             lock.unlock();
         }
-
     }
 
+    /**
+     * 模拟厨师做菜
+     */
     public void zuoCai(){
-
+        lock.lock();
         try {
+            //没有等待制作的菜品时进入等待
             if (foods.size()==0){
-                lock.lock();
                 try {
                     condition.await();
                 } finally {
@@ -200,7 +231,6 @@ public class Shop {
             }else {
 
                 Food food = foods.get(0);
-                lock.lock();
                 try {
                     foods.remove(0);
                     System.out.println(Thread.currentThread().getName()+"取走了"+food.getByCustomer().getCusName()+"所点的菜品单："+food.getFoodName());
@@ -209,18 +239,23 @@ public class Shop {
                     lock.unlock();
                 }
 
-                Thread.sleep(10000);
-                System.out.println(Thread.currentThread().getName()+"用了10秒做好了"+food.getByCustomer().getCusName()+"的食物"+food.getFoodName());
+                //模拟做菜时间
+                Thread.sleep(3000);
+                System.out.println(Thread.currentThread().getName()+"用了3秒做好了"+food.getByCustomer().getCusName()+"的食物"+food.getFoodName());
+
+                //模拟传菜时间（这里传菜也是由厨师负责）
                 Thread.sleep(3000);
                 System.out.println(Thread.currentThread().getName()+"用了3秒将食物"+food.getFoodName() + "送到了顾客手中");
 
-                Thread cusThread = new Thread(() -> {
+                //为点了该菜品的顾客开始吃饭线程
+                new Thread(() -> {
                     try {
-                        Thread.sleep(10000);
+                        //模拟吃饭时间
+                        Thread.sleep(3000);
                         outer:
                         for (Table table:tables) {
                             for (Chair chair : table.getChairs()) {
-                                if (chair.getCustomer().getCusId().equals(food.getByCustomer().getCusId())){
+                                if (!ObjectUtils.isEmpty(chair.getCustomer()) && food.getByCustomer().getCusId().equals(chair.getCustomer().getCusId())){
                                     chair.setCustomer(null);
                                     System.out.println(food.getByCustomer().getCusName()+"吃完了" + food.getFoodName());
                                     break outer;
@@ -230,18 +265,20 @@ public class Shop {
                         }
                         lock.lock();
                         try {
+                            //客人吃完饭离开，唤醒椅子线程接待客人入座
                             condition.signal();
                         } finally {
                             lock.unlock();
                         }
-
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
+                }).start();
 
+                //模拟传菜回到厨房时间
+                Thread.sleep(3000);
+                System.out.println(Thread.currentThread().getName()+"回到了厨房继续工作");
 
-                });
-                cusThread.start();
             }
         } catch (InterruptedException ex) {
             ex.printStackTrace();

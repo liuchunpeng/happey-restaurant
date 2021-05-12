@@ -6,8 +6,12 @@ import com.chinasoft.springboot.thread.ChefThread;
 import com.chinasoft.springboot.thread.MakeCustomerThread;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 
 /**
@@ -17,10 +21,14 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 public class HappyRestaurantController {
-    Shop shop = new Shop();
+
+    Map<String,Shop> userShop = new HashMap<>();
 
     @GetMapping("/happyRestaurant")
-    public String addEmp(Employee employee, Model model){
+    public String happyRestaurant(String user){
+        Shop shop = new Shop();
+        userShop.put(user,shop);
+
         MakeCustomerThread makeCustomer = new MakeCustomerThread(shop);
         Thread makeCustomerThread =new Thread(makeCustomer);
         makeCustomerThread.start();
@@ -42,6 +50,21 @@ public class HappyRestaurantController {
         makeChefThread3.setName("厨师3");
         makeChefThread3.start();
         return "";
+    }
+
+    @GetMapping("/addMenu")
+    public void addMenu(String user) throws InterruptedException {
+        Menu menu = new Menu();
+        List<Food> cai = new ArrayList<>();
+
+        Food food5 = new Food();
+        food5.setFoodId(5);
+        food5.setFoodName("红烧鸡块5");
+
+        cai.add(food5);
+        menu.setMenu(cai);
+
+        userShop.get(user).setMenu(menu);
     }
 
 }
